@@ -1,48 +1,81 @@
-from os import path
-from llama_index import GPTVectorStoreIndex, SimpleDirectoryReader, StorageContext, load_index_from_storage, LLMPredictor, ServiceContext
-from dotenv import load_dotenv
 import streamlit as st
-from langchain import OpenAI
-
-
-import logging
-import sys
-import sys
-
-#logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
-# logging.getLogger().addHandler(logging.StreamHandler(stream=sys.stdout))
+from os import path
+from dotenv import load_dotenv
+from langchain.chat_models import ChatOpenAI
+from langchain import PromptTemplate, LLMChain
+from langchain.prompts.chat import (
+    ChatPromptTemplate,
+    SystemMessagePromptTemplate,
+    AIMessagePromptTemplate,
+    HumanMessagePromptTemplate,
+)
+from langchain.schema import HumanMessage, SystemMessage, AIMessage
+from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
+from langchain.callbacks.base import BaseCallbackHandler
 
 load_dotenv()
 
-st.title("Llama 🚀")
+storage_dir = "./storage/nemisa"
 
-storage_dir = "./storage"
+st.set_page_config(
+    page_title="Gold Diggin'",
+    layout="wide",
+)
 
-llm_predictor = LLMPredictor(llm=OpenAI(
-    temperature=0, model_name="text-davinci-003"))
+# Initialize session state
 
-service_context = ServiceContext.from_defaults(llm_predictor=llm_predictor)
 
-# check if file exists
-if path.exists('storage') & path.exists('storage/docstore.json') & path.exists('storage/index_store.json') & path.exists('storage/vector_store.json'):
-    st.write('Loading from storage')
-    storage_context = StorageContext.from_defaults(
-        persist_dir=storage_dir)
-    index = load_index_from_storage(
-        storage_context, service_context=service_context)
-else:
-    st.write('Creating new index')
-    documents = SimpleDirectoryReader('data/nemisa').load_data()
-    index = GPTVectorStoreIndex.from_documents(
-        documents, service_context=service_context)
-    print(len(documents))
-    index.storage_context.persist(persist_dir=storage_dir)
+st.title("Golden, ⛏️")
 
-# print(index)
-query_engine = index.as_query_engine()
 
-query = st.text_input("Enter your question below:",
-                      "What is the meaning of life?")
+class SessionState:
+    def __init__(self):
+        self.data = []
 
-response = query_engine.query(query)
-st.write(response)
+
+state = SessionState()
+
+
+def append_data(data):
+    state.data.append(data)
+
+
+global output
+
+
+class MyStreamingCallBackHandler(BaseCallbackHandler):
+
+    def on_llm_start(self, serialized: dict, prompts: list, **kwargs) -> None:
+        output.text("Thinking ...")
+
+    def on_llm_new_token(self, token: str, **kwargs) -> None:
+        append_data(token)
+        # convert a list to a string
+        str = ''.join(state.data)
+        output.markdown(str)
+        # print(token, end="", flush=True)
+
+
+chat = ChatOpenAI(streaming=True, callbacks=[MyStreamingCallBackHandler()],
+                  temperature=0.4, model_name="gpt-3.5-turbo")
+
+template = "You are a helpful assistant that only answers the given question in markdown format"
+system_message_prompt = SystemMessagePromptTemplate.from_template(template)
+human_template = "{text}"
+human_message_prompt = HumanMessagePromptTemplate.from_template(human_template)
+
+chat_prompt = ChatPromptTemplate.from_messages(
+    [system_message_prompt, human_message_prompt])
+
+chain = LLMChain(llm=chat, prompt=chat_prompt)
+
+query = st.text_input(
+    "Ask a question")
+
+output = st.empty()
+
+if query:
+    mm = chain.run(text=query)
+
+# print(result)
+# st.write(mm)
