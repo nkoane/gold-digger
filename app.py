@@ -9,8 +9,8 @@ import logging
 import sys
 import sys
 
-logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
-logging.getLogger().addHandler(logging.StreamHandler(stream=sys.stdout))
+#logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
+# logging.getLogger().addHandler(logging.StreamHandler(stream=sys.stdout))
 
 load_dotenv()
 
@@ -32,9 +32,10 @@ if path.exists('storage') & path.exists('storage/docstore.json') & path.exists('
         storage_context, service_context=service_context)
 else:
     st.write('Creating new index')
-    documents = SimpleDirectoryReader('data').load_data()
+    documents = SimpleDirectoryReader('data/nemisa').load_data()
     index = GPTVectorStoreIndex.from_documents(
         documents, service_context=service_context)
+    print(len(documents))
     index.storage_context.persist(persist_dir=storage_dir)
 
 # print(index)
